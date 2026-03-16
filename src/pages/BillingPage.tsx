@@ -32,19 +32,31 @@ export default function BillingPage() {
     return 'bg-warning/10 text-warning border-warning/20';
   };
 
+  // Calculate the next rent due date based on move-in date and existing payments
+  const getNextRentDueDate = (apartmentId: string, moveInDate: string): Date => {
+    const aptPayments = rentPayments
+      .filter(p => p.apartmentId === apartmentId)
+      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime());
+    
+    if (aptPayments.length > 0) {
+      return new Date(aptPayments[0].periodEnd);
+    }
+    return new Date(moveInDate);
+  };
+
   const handleAddRent = () => {
     const apt = apartments.find(a => a.id === rentForm.apartmentId);
     if (!apt?.tenant) return;
     const months = Number(rentForm.months);
     const total = apt.tenant.monthlyRent * months;
-    const now = new Date();
-    const end = new Date(now);
-    end.setMonth(end.getMonth() + months);
+    const periodStart = getNextRentDueDate(apt.id, apt.tenant.moveInDate);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + months);
     addRentPayment({
       tenantId: apt.tenant.id, apartmentId: apt.id, months,
       monthlyAmount: apt.tenant.monthlyRent, totalAmount: total,
-      periodStart: now.toISOString().slice(0, 10),
-      periodEnd: end.toISOString().slice(0, 10),
+      periodStart: periodStart.toISOString().slice(0, 10),
+      periodEnd: periodEnd.toISOString().slice(0, 10),
       status: 'pending', paidDate: null,
     });
     toast.success(`Rent bill created: ${total.toLocaleString()} ETB`);
