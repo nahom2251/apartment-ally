@@ -52,7 +52,7 @@ export default function UserManagementPage() {
   const makeAdmin = async (userId: string) => {
     const { error } = await supabase
       .from('user_roles')
-      .upsert({ user_id: userId, role: 'admin' as any });
+      .upsert({ user_id: userId, role: 'admin' });
 
     if (error) {
       toast.error('Failed to assign admin role');
