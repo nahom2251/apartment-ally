@@ -184,12 +184,24 @@ export default function BillingPage() {
                 </SelectContent>
               </Select>
             </div>
-            {selectedRentApt?.tenant && (
-              <div className="p-3 rounded-lg bg-muted">
-                <p className="text-sm text-muted-foreground">Monthly: {selectedRentApt.tenant.monthlyRent.toLocaleString()} ETB</p>
-                <p className="text-lg font-semibold text-foreground">Total: {rentTotal.toLocaleString()} ETB</p>
-              </div>
-            )}
+            {selectedRentApt?.tenant && (() => {
+              const nextDue = getNextRentDueDate(selectedRentApt.id, selectedRentApt.tenant!.moveInDate);
+              const months = Number(rentForm.months);
+              const periodEnd = new Date(nextDue);
+              periodEnd.setMonth(periodEnd.getMonth() + months);
+              const isOverdue = nextDue < new Date();
+              return (
+                <div className="p-3 rounded-lg bg-muted space-y-1">
+                  <p className="text-xs text-muted-foreground">Move-in Date: {new Date(selectedRentApt.tenant!.moveInDate).toLocaleDateString()}</p>
+                  <p className={cn("text-xs font-medium", isOverdue ? "text-destructive" : "text-success")}>
+                    {isOverdue ? '⚠ Rent Due Since' : 'Next Due Date'}: {nextDue.toLocaleDateString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Period: {nextDue.toLocaleDateString()} → {periodEnd.toLocaleDateString()}</p>
+                  <p className="text-sm text-muted-foreground">Monthly: {selectedRentApt.tenant!.monthlyRent.toLocaleString()} ETB</p>
+                  <p className="text-lg font-semibold text-foreground">Total: {rentTotal.toLocaleString()} ETB</p>
+                </div>
+              );
+            })()}
             <Button className="w-full" onClick={handleAddRent} disabled={!rentForm.apartmentId}>Create Rent Bill</Button>
           </div>
         </DialogContent>
