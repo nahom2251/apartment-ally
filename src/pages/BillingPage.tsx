@@ -32,19 +32,31 @@ export default function BillingPage() {
     return 'bg-warning/10 text-warning border-warning/20';
   };
 
+  // Calculate the next rent due date based on move-in date and existing payments
+  const getNextRentDueDate = (apartmentId: string, moveInDate: string): Date => {
+    const aptPayments = rentPayments
+      .filter(p => p.apartmentId === apartmentId)
+      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime());
+    
+    if (aptPayments.length > 0) {
+      return new Date(aptPayments[0].periodEnd);
+    }
+    return new Date(moveInDate);
+  };
+
   const handleAddRent = () => {
     const apt = apartments.find(a => a.id === rentForm.apartmentId);
     if (!apt?.tenant) return;
     const months = Number(rentForm.months);
     const total = apt.tenant.monthlyRent * months;
-    const now = new Date();
-    const end = new Date(now);
-    end.setMonth(end.getMonth() + months);
+    const periodStart = getNextRentDueDate(apt.id, apt.tenant.moveInDate);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + months);
     addRentPayment({
       tenantId: apt.tenant.id, apartmentId: apt.id, months,
       monthlyAmount: apt.tenant.monthlyRent, totalAmount: total,
-      periodStart: now.toISOString().slice(0, 10),
-      periodEnd: end.toISOString().slice(0, 10),
+      periodStart: periodStart.toISOString().slice(0, 10),
+      periodEnd: periodEnd.toISOString().slice(0, 10),
       status: 'pending', paidDate: null,
     });
     toast.success(`Rent bill created: ${total.toLocaleString()} ETB`);
@@ -136,7 +148,9 @@ export default function BillingPage() {
         <TabsContent value="rent">
           <BillList items={rentPayments.map(p => {
             const apt = apartments.find(a => a.id === p.apartmentId);
-            return { id: p.id, tenant: apt?.tenant?.name || '', unit: apt?.unit || '', amount: p.totalAmount, status: p.status, date: p.createdAt, detail: `${p.months} month(s) · ${p.periodStart} to ${p.periodEnd}`, onPay: () => { markPaid('rent', p.id); toast.success('Marked as paid'); }, onPdf: () => generateRentPDF(p, apt?.tenant?.name || '', apt?.unit || '') };
+            const dueDate = new Date(p.periodEnd);
+            const isOverdue = dueDate < new Date() && p.status !== 'paid';
+            return { id: p.id, tenant: apt?.tenant?.name || '', unit: apt?.unit || '', amount: p.totalAmount, status: isOverdue ? 'overdue' : p.status, date: p.createdAt, detail: `${p.months} month(s) · ${p.periodStart} → ${p.periodEnd} · Due: ${dueDate.toLocaleDateString()}`, onPay: () => { markPaid('rent', p.id); toast.success('Marked as paid'); }, onPdf: () => generateRentPDF(p, apt?.tenant?.name || '', apt?.unit || '') };
           })} statusColor={statusColor} />
         </TabsContent>
 
@@ -172,12 +186,24 @@ export default function BillingPage() {
                 </SelectContent>
               </Select>
             </div>
-            {selectedRentApt?.tenant && (
-              <div className="p-3 rounded-lg bg-muted">
-                <p className="text-sm text-muted-foreground">Monthly: {selectedRentApt.tenant.monthlyRent.toLocaleString()} ETB</p>
-                <p className="text-lg font-semibold text-foreground">Total: {rentTotal.toLocaleString()} ETB</p>
-              </div>
-            )}
+            {selectedRentApt?.tenant && (() => {
+              const nextDue = getNextRentDueDate(selectedRentApt.id, selectedRentApt.tenant!.moveInDate);
+              const months = Number(rentForm.months);
+              const periodEnd = new Date(nextDue);
+              periodEnd.setMonth(periodEnd.getMonth() + months);
+              const isOverdue = nextDue < new Date();
+              return (
+                <div className="p-3 rounded-lg bg-muted space-y-1">
+                  <p className="text-xs text-muted-foreground">Move-in Date: {new Date(selectedRentApt.tenant!.moveInDate).toLocaleDateString()}</p>
+                  <p className={cn("text-xs font-medium", isOverdue ? "text-destructive" : "text-success")}>
+                    {isOverdue ? '⚠ Rent Due Since' : 'Next Due Date'}: {nextDue.toLocaleDateString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Period: {nextDue.toLocaleDateString()} → {periodEnd.toLocaleDateString()}</p>
+                  <p className="text-sm text-muted-foreground">Monthly: {selectedRentApt.tenant!.monthlyRent.toLocaleString()} ETB</p>
+                  <p className="text-lg font-semibold text-foreground">Total: {rentTotal.toLocaleString()} ETB</p>
+                </div>
+              );
+            })()}
             <Button className="w-full" onClick={handleAddRent} disabled={!rentForm.apartmentId}>Create Rent Bill</Button>
           </div>
         </DialogContent>
