@@ -148,7 +148,9 @@ export default function BillingPage() {
         <TabsContent value="rent">
           <BillList items={rentPayments.map(p => {
             const apt = apartments.find(a => a.id === p.apartmentId);
-            return { id: p.id, tenant: apt?.tenant?.name || '', unit: apt?.unit || '', amount: p.totalAmount, status: p.status, date: p.createdAt, detail: `${p.months} month(s) · ${p.periodStart} to ${p.periodEnd}`, onPay: () => { markPaid('rent', p.id); toast.success('Marked as paid'); }, onPdf: () => generateRentPDF(p, apt?.tenant?.name || '', apt?.unit || '') };
+            const dueDate = new Date(p.periodEnd);
+            const isOverdue = dueDate < new Date() && p.status !== 'paid';
+            return { id: p.id, tenant: apt?.tenant?.name || '', unit: apt?.unit || '', amount: p.totalAmount, status: isOverdue ? 'overdue' : p.status, date: p.createdAt, detail: `${p.months} month(s) · ${p.periodStart} → ${p.periodEnd} · Due: ${dueDate.toLocaleDateString()}`, onPay: () => { markPaid('rent', p.id); toast.success('Marked as paid'); }, onPdf: () => generateRentPDF(p, apt?.tenant?.name || '', apt?.unit || '') };
           })} statusColor={statusColor} />
         </TabsContent>
 
